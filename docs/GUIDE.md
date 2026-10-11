@@ -117,7 +117,7 @@ Claude worked in its own cloud workspace, a private computer where it can run pr
 
 8.  **Built the engine around the shaders.** This covered the song analyzer, the automatic editor that plans the cuts, the transitions and hit effects, the glow, the controls, and the two ways to export. Section 6 explains how these work.
 
-9.  **Tested the whole page.** Claude generated a demo beat inside the page at a known 124 BPM, with 4 deliberate section changes, then checked:
+9.  **Tested the whole page.** Claude generated a demo beat inside the page at a known 124 BPM, with 4 deliberate section changes, then checked the points below. (The demo beat was later taken out of the page, so nobody renders it by mistake.)
 
     - The analyzer measured 124.1 BPM and found all 4 section changes.
 
@@ -204,15 +204,13 @@ Everything after step 2 reads from the analysis, so the preview and the exported
 
 Open the page in Chrome or Edge, load a song, press Play, then Render. You can use the [live page](https://hughesdo.github.io/Timewarp-Visualizer/), or download timewarp.html and double-click it to open.
 
-1.  **Start.** The page opens with a built-in demo beat already analyzed, so you can press Play right away.
+1.  **Load your song.** The page opens waiting for one. Click "Load audio file", or drag the file onto the preview. MP3, WAV, M4A, AAC, OGG, FLAC and Opus all work. The analysis takes a few seconds. Play and Render stay off until a song is loaded.
 
-2.  **Load your song.** Click "Load audio file", or drag the file onto the preview. MP3, WAV, M4A, AAC, OGG, FLAC and Opus all work. The analysis takes a few seconds.
+2.  **Preview.** Press Play or the space bar. Left and right arrows jump 5 seconds. Click or drag on the colored timeline to jump anywhere.
 
-3.  **Preview.** Press Play or the space bar. Left and right arrows jump 5 seconds. Click or drag on the colored timeline to jump anywhere.
+3.  **Adjust,** if you want, with the controls below. Every change replans the edit instantly.
 
-4.  **Adjust,** if you want, with the controls below. Every change replans the edit instantly.
-
-5.  **Export.** Pick a size and click "Render MP4 (frame-perfect)". When it finishes, click "Save video".
+4.  **Export.** Pick a size and click "Render MP4 (frame-perfect)". When it finishes, click "Save video".
 
 ### Reading the timeline
 

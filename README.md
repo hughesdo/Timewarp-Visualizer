@@ -29,7 +29,7 @@ The original AI video, [`source/time.mp4`](source/time.mp4), is by @StarlitBeRog
 ## Quick start
 
 1. Open the [live page](https://hughesdo.github.io/Timewarp-Visualizer/), or download `timewarp.html` and double-click it. Use Chrome or Edge.
-2. Press Play to hear the built-in demo beat, or click **Load audio file** (MP3, WAV, M4A, AAC, OGG, FLAC, Opus) or drag a song onto the preview.
+2. Click **Load audio file** (MP3, WAV, M4A, AAC, OGG, FLAC, Opus) or drag a song onto the preview. Nothing plays or renders until a song is loaded.
 3. Adjust if you like: scene lengths, cut grid, transition style, hit effects, reactivity, output size.
 4. Click **Render MP4 (frame-perfect)**, then **Save video**. The file is ready to post to X as is.
 

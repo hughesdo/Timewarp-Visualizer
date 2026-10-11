@@ -11,7 +11,7 @@ const store = {
 };
 
 const S = {
-  A: null, plan: null, name: '', isDemo: true,
+  A: null, plan: null, name: '',
   cfg: Object.assign({ enabled: SCENES.map((_, i) => i), minSeg: 4, maxSeg: 10, cutOn: 'bar', transStyle: 'mixed', fx: 0.6, react: 1.0, seed: 1, followSections: true, energyMatch: true }, store.get('cfg', {})),
   out: Object.assign({ res: '1920x1080', fps: 60, mbps: 16, preview: 0.5 }, store.get('out', {})),
   solo: null, recording: false, exporting: false, cancel: false, dirty: true, ready: false,
@@ -60,14 +60,14 @@ function replan() {
 }
 
 // ------------------------------------------------------------ track loading
-async function useBuffer(buf, name, isDemo) {
-  player.setBuffer(buf);
-  S.name = name; S.isDemo = !!isDemo;
-  $('#trackName').textContent = name;
+async function useBuffer(buf, name) {
   status('Analyzing the track…');
   progress(0);
-  S.A = await analyzeAudio(buf, p => progress(p));
+  const analysis = await analyzeAudio(buf, p => progress(p));   // swap song and analysis together, never half
   progress(null);
+  player.setBuffer(buf);
+  S.A = analysis; S.name = name;
+  $('#trackName').textContent = name;
   const A = S.A;
   $('#trackStats').innerHTML = '';
   const stats = [
@@ -82,9 +82,10 @@ async function useBuffer(buf, name, isDemo) {
   $('#bpm').textContent = `${A.bpm.toFixed(0)} BPM`;
   replan();
   updateEstimate();
-  status(isDemo ? 'Demo beat loaded. Press play, or load your own track.' : `Loaded “${name}”. Press play to preview.`);
-  $('#overlay').hidden = false;
-  $('#overlayTitle').textContent = isDemo ? 'Demo beat ready' : name;
+  status(`Loaded “${name}”. Press play to preview.`);
+  setOverlay(name, 'Press play to preview. Render when you like what you see.', 'Load a different song', true);
+  for (const id of ['#playBtn', '#recBtn']) $(id).disabled = false;
+  $('#renderBtn').disabled = !(S.canRender && S.A);
   updateTransport();
 }
 
@@ -92,24 +93,31 @@ async function loadFile(file) {
   if (!file) return;
   if (S.recording || S.exporting) return;
   try {
+    player.stop(); updateTransport();
+    for (const id of ['#playBtn', '#recBtn', '#renderBtn']) $(id).disabled = true;
     status(`Decoding “${file.name}”…`);
     progress(0.02);
     const ab = await file.arrayBuffer();
     const ctx = player.ensure();
     const buf = await new Promise((res, rej) => { const p = ctx.decodeAudioData(ab, res, rej); if (p && p.then) p.then(res, rej); });
-    await useBuffer(buf, file.name.replace(/\.[^.]+$/, ''), false);
+    await useBuffer(buf, file.name.replace(/\.[^.]+$/, ''));
   } catch (e) {
     progress(null);
+    if (S.A) { for (const id of ['#playBtn', '#recBtn']) $(id).disabled = false; $('#renderBtn').disabled = !S.canRender; }
     status(`Couldn’t read that file. Try an MP3, WAV, M4A, OGG or FLAC.`, 'error');
     console.error(e);
   }
 }
 
-async function loadDemo() {
-  status('Building the demo beat…');
-  progress(0.05);
-  const buf = await synthDemo();
-  await useBuffer(buf, 'Demo beat · 124 BPM', true);
+// The stage overlay: before a song is loaded it asks for one; afterwards it shows the song and a play button.
+function setOverlay(title, text, buttonLabel, canPlay) {
+  $('#overlayTitle').textContent = title;
+  $('#overlayText').textContent = text;
+  $('#overlayFile').textContent = buttonLabel;
+  $('#overlayFile').classList.toggle('primary', !canPlay);
+  $('#overlayFile').hidden = false;
+  $('#bigPlay').hidden = !canPlay;
+  $('#overlay').hidden = false;
 }
 
 // ------------------------------------------------------------ render loop
@@ -398,8 +406,9 @@ function setExportUI(on, text) {
   $('#exportProg').hidden = !on;
   $('#exportText').textContent = text || '';
   $('#exportBar').style.setProperty('--p', '0%');
-  for (const id of ['#recBtn', '#fileBtn', '#demoBtn', '#playBtn']) $(id).disabled = on;
-  $('#renderBtn').disabled = on || !S.canRender;
+  $('#fileBtn').disabled = on;
+  for (const id of ['#recBtn', '#playBtn']) $(id).disabled = on || !S.A;
+  $('#renderBtn').disabled = on || !S.canRender || !S.A;
   $('#cancelBtn').hidden = !on;
   updateTransport();
 }
@@ -461,7 +470,7 @@ async function updatePreflight() {
     tip = 'MP4 with H.264 video and AAC-LC audio, the format X recommends.';
   }
   S.canRender = !!(p.video && p.audio);
-  if (!S.exporting && !S.recording) $('#renderBtn').disabled = !S.canRender;
+  if (!S.exporting && !S.recording) $('#renderBtn').disabled = !S.canRender || !S.A;
   const el = $('#preflight');
   el.dataset.level = level; el.textContent = text; el.title = tip;
 }
@@ -530,7 +539,7 @@ let meterEls = [];
 async function boot() {
   const canvas = $('#view');
   try { R = new Renderer(canvas); }
-  catch (e) { status(e.message, 'error'); $('#overlayTitle').textContent = 'WebGL2 unavailable'; return; }
+  catch (e) { status(e.message, 'error'); $('#overlayTitle').textContent = 'WebGL2 unavailable'; $('#overlayText').textContent = 'This browser or graphics driver can’t run the shaders. Try Chrome or Edge, and update your graphics driver.'; return; }
   applyAspect();
   bindSettings();
   meterEls = [...document.querySelectorAll('#meters .m')];
@@ -546,7 +555,6 @@ async function boot() {
   $('#fileBtn').addEventListener('click', () => $('#file').click());
   $('#overlayFile').addEventListener('click', () => $('#file').click());
   $('#file').addEventListener('change', (e) => { loadFile(e.target.files[0]); e.target.value = ''; });
-  $('#demoBtn').addEventListener('click', () => { if (!S.recording && !S.exporting) { player.stop(); loadDemo(); } });
   $('#recBtn').addEventListener('click', recordRealtime);
   $('#renderBtn').addEventListener('click', exportFramePerfect);
   $('#cancelBtn').addEventListener('click', () => { S.cancel = true; });
@@ -571,15 +579,15 @@ async function boot() {
   try {
     await R.compileAll(buildProgramDefs(), (p, name) => { progress(p * 0.5); status(`Compiling shaders… ${name}`); });
   } catch (e) {
-    progress(null); status('A shader failed to compile on this GPU. Details are in the console.', 'error'); console.error(e); return;
+    progress(null); status('A shader failed to compile on this GPU. Details are in the console.', 'error'); $('#overlayTitle').textContent = 'Shaders failed to compile'; $('#overlayText').textContent = 'Details are in the browser console. Updating your graphics driver may help.'; console.error(e); return;
   }
   try { await Promise.race([document.fonts.load('80px "Caveat"'), new Promise(r => setTimeout(r, 2500))]); } catch (e) {}
   R.setMathAtlas(buildMathAtlas());
   S.ready = true;
   requestAnimationFrame(frame);
-  await loadDemo();
-  player.offset = Math.min(S.A.duration * 0.33, 8.2);
-  S.dirty = true;
+  progress(null);
+  status('Load a song to start.');
+  setOverlay('Load a song to start', 'Drop an audio file on this frame, or click the button. MP3, WAV, M4A, AAC, OGG, FLAC and Opus all work.', 'Load audio file', false);
   updatePreflight();
 }
 boot();

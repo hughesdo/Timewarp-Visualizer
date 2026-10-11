@@ -158,7 +158,7 @@ details.xhelp summary:hover, details.xhelp[open] summary { color: var(--text); }
 .xhelp-body p { margin: 0; }
 .xhelp-body b { color: var(--text); font-weight: 600; }
 .xhelp-body a { color: var(--holo); }
-@media (max-width: 640px) { .overlay p, .overlay .row { display: none; } .big { width: 56px; height: 56px; } .overlay h2 { font-size: 15px; } .meters { margin-left: 0; } }
+@media (max-width: 640px) { .overlay p { display: none; } .big { width: 56px; height: 56px; } .overlay h2 { font-size: 15px; } .meters { margin-left: 0; } }
 @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
 </style>
 
@@ -176,15 +176,15 @@ details.xhelp summary:hover, details.xhelp[open] summary { color: var(--text); }
       <button type="button" class="fs" id="fsBtn">Fullscreen</button>
       <div class="overlay" id="overlay">
         <div class="card">
-          <button type="button" class="big" id="bigPlay" aria-label="Play"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 4l14 8-14 8z"/></svg></button>
+          <button type="button" class="big" id="bigPlay" aria-label="Play" hidden><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 4l14 8-14 8z"/></svg></button>
           <h2 id="overlayTitle">Loading shaders</h2>
-          <p>Drop an audio file anywhere on this frame, or load one. Every scene is used before any repeats, and cuts land on the bar.</p>
-          <div class="row"><button type="button" class="btn" id="overlayFile">Load your track</button></div>
+          <p id="overlayText">Getting the 12 scenes ready for your graphics card.</p>
+          <div class="row"><button type="button" class="btn" id="overlayFile" hidden>Load audio file</button></div>
         </div>
       </div>
     </div>
     <div class="transport">
-      <button type="button" class="btn primary" id="playBtn" aria-pressed="false">Play</button>
+      <button type="button" class="btn primary" id="playBtn" aria-pressed="false" disabled>Play</button>
       <span class="clock" id="clock">0:00.0 / 0:00.0</span>
       <span class="pill" id="bpm">— BPM</span>
       <div class="meters" id="meters" aria-hidden="true">
@@ -199,10 +199,9 @@ details.xhelp summary:hover, details.xhelp[open] summary { color: var(--text); }
   <aside class="rail" aria-label="Controls">
     <section class="card">
       <h3>Track</h3>
-      <div class="trackname" id="trackName">—</div>
+      <div class="trackname" id="trackName">No song loaded</div>
       <div class="row2">
         <button type="button" class="btn primary" id="fileBtn">Load audio file</button>
-        <button type="button" class="btn ghost" id="demoBtn">Demo beat</button>
         <input type="file" id="file" accept="audio/*,.mp3,.wav,.m4a,.aac,.ogg,.flac,.opus" hidden>
       </div>
       <dl class="stats" id="trackStats"></dl>
@@ -276,8 +275,8 @@ details.xhelp summary:hover, details.xhelp[open] summary { color: var(--text); }
       </div>
       <p class="preflight" id="preflight" title="Checks which video and audio formats this browser can write.">Checking what this browser can write…</p>
       <div class="row2">
-        <button type="button" class="btn primary" id="renderBtn" title="Renders every frame offline and saves an MP4 with H.264 video and AAC audio. Nothing drops, even at 4K. The one to use for posting to X.">Render MP4 (frame-perfect)</button>
-        <button type="button" class="btn" id="recBtn" title="Plays the song once and captures what you see and hear. Quick, but a busy computer can drop frames. For posting, use Render MP4.">Record in real time</button>
+        <button type="button" class="btn primary" id="renderBtn" disabled title="Renders every frame offline and saves an MP4 with H.264 video and AAC audio. Nothing drops, even at 4K. The one to use for posting to X.">Render MP4 (frame-perfect)</button>
+        <button type="button" class="btn" id="recBtn" disabled title="Plays the song once and captures what you see and hear. Quick, but a busy computer can drop frames. For posting, use Render MP4.">Record in real time</button>
       </div>
       <p class="note" id="renderNote">Render MP4 draws every frame offline, so nothing drops even at 4K. Use it for anything you post. Real-time recording plays the track once and captures what you see.</p>
       <details class="xhelp" id="xHelp">
@@ -1587,7 +1586,7 @@ class Renderer {
 }
 
 
-// ============================================================ playback, demo beat, export
+// ============================================================ playback, export
 class Player {
   constructor() { this.ctx = null; this.buffer = null; this.src = null; this.playing = false; this.offset = 0; this.startAt = 0; this.onEnded = null; this.recDest = null; }
   ensure() {
@@ -1633,73 +1632,6 @@ class Player {
     if (!this.recDest) { this.recDest = ctx.createMediaStreamDestination(); this.gain.connect(this.recDest); }
     return this.recDest.stream;
   }
-}
-
-// 124 BPM demo: intro, groove, drop, breakdown, final drop. Gives the analyser real sections to find.
-async function synthDemo() {
-  const sr = 44100, bpm = 124, beat = 60 / bpm, bars = 24;
-  const dur = bars * 4 * beat + 2;
-  const oc = new OfflineAudioContext(2, Math.ceil(sr * dur), sr);
-  const comp = oc.createDynamicsCompressor();
-  comp.threshold.value = -14; comp.ratio.value = 4; comp.attack.value = 0.005; comp.release.value = 0.12;
-  const master = oc.createGain(); master.gain.value = 0.7;
-  master.connect(comp); comp.connect(oc.destination);
-  const nb = oc.createBuffer(1, sr, sr); const nd = nb.getChannelData(0);
-  let s = 22; for (let i = 0; i < sr; i++) { s = (s * 16807) % 2147483647; nd[i] = s / 1073741823.5 - 1; }
-  const noise = (t, len, filt, f, q, g, dec) => {
-    const n = oc.createBufferSource(); n.buffer = nb;
-    const fl = oc.createBiquadFilter(); fl.type = filt; fl.frequency.value = f; fl.Q.value = q;
-    const a = oc.createGain(); a.gain.setValueAtTime(g, t); a.gain.exponentialRampToValueAtTime(0.0008, t + dec);
-    n.connect(fl); fl.connect(a); a.connect(master); n.start(t, Math.random() * 0.5); n.stop(t + len);
-  };
-  const kick = (t, g = 1) => {
-    const o = oc.createOscillator(); o.type = 'sine';
-    o.frequency.setValueAtTime(165, t); o.frequency.exponentialRampToValueAtTime(46, t + 0.11);
-    const a = oc.createGain(); a.gain.setValueAtTime(1.1 * g, t); a.gain.exponentialRampToValueAtTime(0.001, t + 0.42);
-    o.connect(a); a.connect(master); o.start(t); o.stop(t + 0.45);
-    noise(t, 0.02, 'highpass', 3000, 0.7, 0.25 * g, 0.015);
-  };
-  const snare = (t, g = 1) => {
-    noise(t, 0.25, 'bandpass', 1900, 0.6, 0.75 * g, 0.2);
-    const o = oc.createOscillator(); o.type = 'triangle'; o.frequency.setValueAtTime(200, t); o.frequency.exponentialRampToValueAtTime(150, t + 0.08);
-    const a = oc.createGain(); a.gain.setValueAtTime(0.5 * g, t); a.gain.exponentialRampToValueAtTime(0.001, t + 0.12);
-    o.connect(a); a.connect(master); o.start(t); o.stop(t + 0.14);
-  };
-  const hat = (t, open, g = 1) => noise(t, open ? 0.3 : 0.06, 'highpass', 7500, 0.8, (open ? 0.22 : 0.16) * g, open ? 0.24 : 0.045);
-  const midi = m => 440 * Math.pow(2, (m - 69) / 12);
-  const synth = (t, len, note, type, cut, g, env = 0.01, det = 0) => {
-    const o = oc.createOscillator(); o.type = type; o.frequency.value = midi(note); o.detune.value = det;
-    const f = oc.createBiquadFilter(); f.type = 'lowpass'; f.frequency.setValueAtTime(cut * 2.2, t); f.frequency.exponentialRampToValueAtTime(cut, t + Math.min(len, 0.25)); f.Q.value = 3;
-    const a = oc.createGain(); a.gain.setValueAtTime(0.0001, t); a.gain.linearRampToValueAtTime(g, t + env); a.gain.setValueAtTime(g, t + len * 0.8); a.gain.exponentialRampToValueAtTime(0.0005, t + len);
-    o.connect(f); f.connect(a); a.connect(master); o.start(t); o.stop(t + len + 0.02);
-  };
-  const chords = [[57, 60, 64], [53, 57, 60], [48, 52, 55], [55, 59, 62]]; // Am F C G
-  const roots = [33, 29, 36, 31];
-  for (let bar = 0; bar < bars; bar++) {
-    const t0 = 0.05 + bar * 4 * beat;
-    const sec = bar < 4 ? 'intro' : bar < 8 ? 'groove' : bar < 14 ? 'drop' : bar < 18 ? 'break' : 'drop2';
-    const ch = chords[Math.floor(bar / 2) % 4], root = roots[Math.floor(bar / 2) % 4];
-    // pad
-    if (bar % 2 === 0) for (const n of ch) { synth(t0, 8 * beat, n, 'sawtooth', sec === 'break' ? 2200 : 900, 0.05, 0.6, -8); synth(t0, 8 * beat, n, 'sawtooth', 900, 0.04, 0.6, 9); }
-    for (let b = 0; b < 4; b++) {
-      const t = t0 + b * beat;
-      const loud = sec === 'drop' || sec === 'drop2';
-      if (sec !== 'intro' && sec !== 'break') kick(t, loud ? 1 : 0.85);
-      if (loud && (b === 1 || b === 3)) snare(t);
-      if (sec === 'groove' && b === 3 && bar % 2 === 1) snare(t, 0.6);
-      hat(t + beat / 2, loud && b % 2 === 1, loud ? 1 : 0.6);
-      if (sec !== 'intro') hat(t + beat * 0.75, false, 0.5);
-      if (sec !== 'intro' && sec !== 'break') {
-        synth(t + beat * 0.5, beat * 0.45, root + 12, 'sawtooth', loud ? 700 : 450, 0.32);
-        if (loud) synth(t, beat * 0.3, root, 'square', 300, 0.22);
-      }
-      if (loud || sec === 'break') {
-        for (let k = 0; k < 2; k++) synth(t + k * beat / 2, beat * 0.4, ch[(b * 2 + k) % 3] + 12 + (sec === 'drop2' ? 12 : 0), 'square', 2500, sec === 'break' ? 0.07 : 0.05, 0.005);
-      }
-    }
-    if (bar === 13 || bar === 17) for (let k = 0; k < 8; k++) snare(t0 + 2 * beat + k * beat / 4, 0.4 + k * 0.07);
-  }
-  return await oc.startRendering();
 }
 
 // Real-time recording: MP4 with H.264 + AAC where the browser can, otherwise WebM (which X won't take).
@@ -1939,7 +1871,7 @@ const store = {
 };
 
 const S = {
-  A: null, plan: null, name: '', isDemo: true,
+  A: null, plan: null, name: '',
   cfg: Object.assign({ enabled: SCENES.map((_, i) => i), minSeg: 4, maxSeg: 10, cutOn: 'bar', transStyle: 'mixed', fx: 0.6, react: 1.0, seed: 1, followSections: true, energyMatch: true }, store.get('cfg', {})),
   out: Object.assign({ res: '1920x1080', fps: 60, mbps: 16, preview: 0.5 }, store.get('out', {})),
   solo: null, recording: false, exporting: false, cancel: false, dirty: true, ready: false,
@@ -1988,14 +1920,14 @@ function replan() {
 }
 
 // ------------------------------------------------------------ track loading
-async function useBuffer(buf, name, isDemo) {
-  player.setBuffer(buf);
-  S.name = name; S.isDemo = !!isDemo;
-  $('#trackName').textContent = name;
+async function useBuffer(buf, name) {
   status('Analyzing the track…');
   progress(0);
-  S.A = await analyzeAudio(buf, p => progress(p));
+  const analysis = await analyzeAudio(buf, p => progress(p));   // swap song and analysis together, never half
   progress(null);
+  player.setBuffer(buf);
+  S.A = analysis; S.name = name;
+  $('#trackName').textContent = name;
   const A = S.A;
   $('#trackStats').innerHTML = '';
   const stats = [
@@ -2010,9 +1942,10 @@ async function useBuffer(buf, name, isDemo) {
   $('#bpm').textContent = `${A.bpm.toFixed(0)} BPM`;
   replan();
   updateEstimate();
-  status(isDemo ? 'Demo beat loaded. Press play, or load your own track.' : `Loaded “${name}”. Press play to preview.`);
-  $('#overlay').hidden = false;
-  $('#overlayTitle').textContent = isDemo ? 'Demo beat ready' : name;
+  status(`Loaded “${name}”. Press play to preview.`);
+  setOverlay(name, 'Press play to preview. Render when you like what you see.', 'Load a different song', true);
+  for (const id of ['#playBtn', '#recBtn']) $(id).disabled = false;
+  $('#renderBtn').disabled = !(S.canRender && S.A);
   updateTransport();
 }
 
@@ -2020,24 +1953,31 @@ async function loadFile(file) {
   if (!file) return;
   if (S.recording || S.exporting) return;
   try {
+    player.stop(); updateTransport();
+    for (const id of ['#playBtn', '#recBtn', '#renderBtn']) $(id).disabled = true;
     status(`Decoding “${file.name}”…`);
     progress(0.02);
     const ab = await file.arrayBuffer();
     const ctx = player.ensure();
     const buf = await new Promise((res, rej) => { const p = ctx.decodeAudioData(ab, res, rej); if (p && p.then) p.then(res, rej); });
-    await useBuffer(buf, file.name.replace(/\.[^.]+$/, ''), false);
+    await useBuffer(buf, file.name.replace(/\.[^.]+$/, ''));
   } catch (e) {
     progress(null);
+    if (S.A) { for (const id of ['#playBtn', '#recBtn']) $(id).disabled = false; $('#renderBtn').disabled = !S.canRender; }
     status(`Couldn’t read that file. Try an MP3, WAV, M4A, OGG or FLAC.`, 'error');
     console.error(e);
   }
 }
 
-async function loadDemo() {
-  status('Building the demo beat…');
-  progress(0.05);
-  const buf = await synthDemo();
-  await useBuffer(buf, 'Demo beat · 124 BPM', true);
+// The stage overlay: before a song is loaded it asks for one; afterwards it shows the song and a play button.
+function setOverlay(title, text, buttonLabel, canPlay) {
+  $('#overlayTitle').textContent = title;
+  $('#overlayText').textContent = text;
+  $('#overlayFile').textContent = buttonLabel;
+  $('#overlayFile').classList.toggle('primary', !canPlay);
+  $('#overlayFile').hidden = false;
+  $('#bigPlay').hidden = !canPlay;
+  $('#overlay').hidden = false;
 }
 
 // ------------------------------------------------------------ render loop
@@ -2326,8 +2266,9 @@ function setExportUI(on, text) {
   $('#exportProg').hidden = !on;
   $('#exportText').textContent = text || '';
   $('#exportBar').style.setProperty('--p', '0%');
-  for (const id of ['#recBtn', '#fileBtn', '#demoBtn', '#playBtn']) $(id).disabled = on;
-  $('#renderBtn').disabled = on || !S.canRender;
+  $('#fileBtn').disabled = on;
+  for (const id of ['#recBtn', '#playBtn']) $(id).disabled = on || !S.A;
+  $('#renderBtn').disabled = on || !S.canRender || !S.A;
   $('#cancelBtn').hidden = !on;
   updateTransport();
 }
@@ -2389,7 +2330,7 @@ async function updatePreflight() {
     tip = 'MP4 with H.264 video and AAC-LC audio, the format X recommends.';
   }
   S.canRender = !!(p.video && p.audio);
-  if (!S.exporting && !S.recording) $('#renderBtn').disabled = !S.canRender;
+  if (!S.exporting && !S.recording) $('#renderBtn').disabled = !S.canRender || !S.A;
   const el = $('#preflight');
   el.dataset.level = level; el.textContent = text; el.title = tip;
 }
@@ -2458,7 +2399,7 @@ let meterEls = [];
 async function boot() {
   const canvas = $('#view');
   try { R = new Renderer(canvas); }
-  catch (e) { status(e.message, 'error'); $('#overlayTitle').textContent = 'WebGL2 unavailable'; return; }
+  catch (e) { status(e.message, 'error'); $('#overlayTitle').textContent = 'WebGL2 unavailable'; $('#overlayText').textContent = 'This browser or graphics driver can’t run the shaders. Try Chrome or Edge, and update your graphics driver.'; return; }
   applyAspect();
   bindSettings();
   meterEls = [...document.querySelectorAll('#meters .m')];
@@ -2474,7 +2415,6 @@ async function boot() {
   $('#fileBtn').addEventListener('click', () => $('#file').click());
   $('#overlayFile').addEventListener('click', () => $('#file').click());
   $('#file').addEventListener('change', (e) => { loadFile(e.target.files[0]); e.target.value = ''; });
-  $('#demoBtn').addEventListener('click', () => { if (!S.recording && !S.exporting) { player.stop(); loadDemo(); } });
   $('#recBtn').addEventListener('click', recordRealtime);
   $('#renderBtn').addEventListener('click', exportFramePerfect);
   $('#cancelBtn').addEventListener('click', () => { S.cancel = true; });
@@ -2499,15 +2439,15 @@ async function boot() {
   try {
     await R.compileAll(buildProgramDefs(), (p, name) => { progress(p * 0.5); status(`Compiling shaders… ${name}`); });
   } catch (e) {
-    progress(null); status('A shader failed to compile on this GPU. Details are in the console.', 'error'); console.error(e); return;
+    progress(null); status('A shader failed to compile on this GPU. Details are in the console.', 'error'); $('#overlayTitle').textContent = 'Shaders failed to compile'; $('#overlayText').textContent = 'Details are in the browser console. Updating your graphics driver may help.'; console.error(e); return;
   }
   try { await Promise.race([document.fonts.load('80px "Caveat"'), new Promise(r => setTimeout(r, 2500))]); } catch (e) {}
   R.setMathAtlas(buildMathAtlas());
   S.ready = true;
   requestAnimationFrame(frame);
-  await loadDemo();
-  player.offset = Math.min(S.A.duration * 0.33, 8.2);
-  S.dirty = true;
+  progress(null);
+  status('Load a song to start.');
+  setOverlay('Load a song to start', 'Drop an audio file on this frame, or click the button. MP3, WAV, M4A, AAC, OGG, FLAC and Opus all work.', 'Load audio file', false);
   updatePreflight();
 }
 boot();

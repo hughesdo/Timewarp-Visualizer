@@ -156,7 +156,7 @@ details.xhelp summary:hover, details.xhelp[open] summary { color: var(--text); }
 .xhelp-body p { margin: 0; }
 .xhelp-body b { color: var(--text); font-weight: 600; }
 .xhelp-body a { color: var(--holo); }
-@media (max-width: 640px) { .overlay p, .overlay .row { display: none; } .big { width: 56px; height: 56px; } .overlay h2 { font-size: 15px; } .meters { margin-left: 0; } }
+@media (max-width: 640px) { .overlay p { display: none; } .big { width: 56px; height: 56px; } .overlay h2 { font-size: 15px; } .meters { margin-left: 0; } }
 @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
 </style>
 
@@ -174,15 +174,15 @@ details.xhelp summary:hover, details.xhelp[open] summary { color: var(--text); }
       <button type="button" class="fs" id="fsBtn">Fullscreen</button>
       <div class="overlay" id="overlay">
         <div class="card">
-          <button type="button" class="big" id="bigPlay" aria-label="Play"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 4l14 8-14 8z"/></svg></button>
+          <button type="button" class="big" id="bigPlay" aria-label="Play" hidden><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 4l14 8-14 8z"/></svg></button>
           <h2 id="overlayTitle">Loading shaders</h2>
-          <p>Drop an audio file anywhere on this frame, or load one. Every scene is used before any repeats, and cuts land on the bar.</p>
-          <div class="row"><button type="button" class="btn" id="overlayFile">Load your track</button></div>
+          <p id="overlayText">Getting the 12 scenes ready for your graphics card.</p>
+          <div class="row"><button type="button" class="btn" id="overlayFile" hidden>Load audio file</button></div>
         </div>
       </div>
     </div>
     <div class="transport">
-      <button type="button" class="btn primary" id="playBtn" aria-pressed="false">Play</button>
+      <button type="button" class="btn primary" id="playBtn" aria-pressed="false" disabled>Play</button>
       <span class="clock" id="clock">0:00.0 / 0:00.0</span>
       <span class="pill" id="bpm">— BPM</span>
       <div class="meters" id="meters" aria-hidden="true">
@@ -197,10 +197,9 @@ details.xhelp summary:hover, details.xhelp[open] summary { color: var(--text); }
   <aside class="rail" aria-label="Controls">
     <section class="card">
       <h3>Track</h3>
-      <div class="trackname" id="trackName">—</div>
+      <div class="trackname" id="trackName">No song loaded</div>
       <div class="row2">
         <button type="button" class="btn primary" id="fileBtn">Load audio file</button>
-        <button type="button" class="btn ghost" id="demoBtn">Demo beat</button>
         <input type="file" id="file" accept="audio/*,.mp3,.wav,.m4a,.aac,.ogg,.flac,.opus" hidden>
       </div>
       <dl class="stats" id="trackStats"></dl>
@@ -274,8 +273,8 @@ details.xhelp summary:hover, details.xhelp[open] summary { color: var(--text); }
       </div>
       <p class="preflight" id="preflight" title="Checks which video and audio formats this browser can write.">Checking what this browser can write…</p>
       <div class="row2">
-        <button type="button" class="btn primary" id="renderBtn" title="Renders every frame offline and saves an MP4 with H.264 video and AAC audio. Nothing drops, even at 4K. The one to use for posting to X.">Render MP4 (frame-perfect)</button>
-        <button type="button" class="btn" id="recBtn" title="Plays the song once and captures what you see and hear. Quick, but a busy computer can drop frames. For posting, use Render MP4.">Record in real time</button>
+        <button type="button" class="btn primary" id="renderBtn" disabled title="Renders every frame offline and saves an MP4 with H.264 video and AAC audio. Nothing drops, even at 4K. The one to use for posting to X.">Render MP4 (frame-perfect)</button>
+        <button type="button" class="btn" id="recBtn" disabled title="Plays the song once and captures what you see and hear. Quick, but a busy computer can drop frames. For posting, use Render MP4.">Record in real time</button>
       </div>
       <p class="note" id="renderNote">Render MP4 draws every frame offline, so nothing drops even at 4K. Use it for anything you post. Real-time recording plays the track once and captures what you see.</p>
       <details class="xhelp" id="xHelp">
