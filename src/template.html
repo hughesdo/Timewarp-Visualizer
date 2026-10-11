@@ -1,0 +1,251 @@
+<title>Timewarp Visualizer</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Caveat:wght@500&family=Cinzel:wght@500;600;700&family=Figtree:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: a dark grading-suite — stage + transport on the left, a tall control rail on the right; stacks on phones. */
+:root {
+  color-scheme: dark;
+  --ink: #0c0a12;        /* page */
+  --panel: #14111c;      /* rails & cards */
+  --well: #1b1726;       /* inputs, wells */
+  --line: #2b2638;       /* hairlines */
+  --text: #ece6f3;
+  --muted: #9b93ac;
+  --brass: #ffb48a;      /* eclipse-ring peach, the one accent */
+  --brass-ink: #2a1408;
+  --holo: #7fe3ee;       /* meters, live state */
+  --danger: #ff7a86;
+  --f-display: "Cinzel", "Trajan Pro", Georgia, serif;
+  --f-body: "Figtree", "Segoe UI", system-ui, sans-serif;
+  --f-mono: "JetBrains Mono", ui-monospace, "SFMono-Regular", Menlo, monospace;
+  --r: 10px;
+}
+* { box-sizing: border-box; }
+[hidden] { display: none !important; }
+html, body { height: 100%; }
+body { background: var(--ink); color: var(--text); font: 14px/1.5 var(--f-body); padding-inline: 16px; padding-block: 0 24px; }
+button, input, select { font: inherit; color: inherit; }
+:focus-visible { outline: 2px solid var(--holo); outline-offset: 2px; }
+
+.top { display: flex; align-items: baseline; gap: 16px; flex-wrap: wrap; padding-block: 16px 12px; max-width: 1600px; margin-inline: auto; }
+.brand { display: flex; align-items: baseline; gap: 12px; }
+.brand h1 { font: 600 22px/1 var(--f-display); letter-spacing: 0.14em; margin: 0; text-transform: uppercase; }
+.brand span { color: var(--muted); font-size: 13px; }
+.status { margin-left: auto; color: var(--muted); font-size: 13px; min-height: 1.5em; min-width: 0; }
+.status[data-kind="error"] { color: var(--danger); }
+.busy { height: 2px; background: var(--line); max-width: 1600px; margin-inline: auto; position: relative; overflow: hidden; }
+.busy::after { content: ""; position: absolute; inset: 0 auto 0 0; width: var(--p, 0%); background: var(--brass); transition: width .2s; }
+
+.studio { display: grid; grid-template-columns: minmax(0, 1fr) 360px; gap: 20px; max-width: 1600px; margin-inline: auto; padding-top: 14px; align-items: start; }
+@media (max-width: 980px) { .studio { grid-template-columns: minmax(0, 1fr); } }
+
+/* stage */
+.stage-col { display: flex; flex-direction: column; gap: 12px; min-width: 0; }
+.stage { --ar: 16 / 9; position: relative; aspect-ratio: var(--ar); width: 100%; max-width: 100%; background: #000; border-radius: var(--r); overflow: hidden; border: 1px solid var(--line); margin-inline: auto; }
+.stage.tall { width: auto; height: min(72vh, 900px); }
+.stage canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+.stage.drop { outline: 2px dashed var(--brass); outline-offset: -8px; }
+.hud { position: absolute; left: 12px; top: 10px; font: 600 12px/1 var(--f-display); letter-spacing: .12em; text-transform: uppercase; color: rgba(255,255,255,.78); text-shadow: 0 1px 6px rgba(0,0,0,.8); pointer-events: none; }
+.fs { position: absolute; right: 10px; top: 8px; background: rgba(12,10,18,.55); border: 1px solid rgba(255,255,255,.15); border-radius: 6px; padding: 3px 9px; font-size: 12px; cursor: pointer; color: var(--text); }
+.overlay { position: absolute; inset: 0; display: grid; place-items: center; background: radial-gradient(ellipse at center, rgba(12,10,18,.25), rgba(12,10,18,.7)); }
+.overlay .card { background: rgba(20,17,28,.78); backdrop-filter: blur(6px); text-align: center; display: grid; gap: 12px; justify-items: center; padding: 16px; }
+.overlay h2 { font: 600 clamp(16px, 2.4vw, 24px)/1.2 var(--f-display); letter-spacing: .1em; margin: 0; text-wrap: balance; }
+.overlay p { margin: 0; color: var(--muted); max-width: 46ch; }
+.overlay .row { display: flex; gap: 10px; flex-wrap: wrap; justify-content: center; }
+.big { width: 76px; height: 76px; border-radius: 50%; border: 1px solid var(--brass); background: rgba(255,180,138,.12); cursor: pointer; display: grid; place-items: center; transition: transform .15s, background .15s; }
+.big:hover { transform: scale(1.05); background: rgba(255,180,138,.22); }
+.big svg { width: 30px; height: 30px; fill: var(--brass); margin-left: 5px; }
+
+/* transport */
+.transport { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }
+.clock { font: 500 13px var(--f-mono); font-variant-numeric: tabular-nums; color: var(--text); }
+.pill { font: 500 12px var(--f-mono); color: var(--muted); border: 1px solid var(--line); border-radius: 99px; padding: 2px 9px; }
+.meters { display: flex; gap: 6px; align-items: flex-end; margin-left: auto; }
+.m { display: grid; justify-items: center; gap: 3px; }
+.m i { display: block; width: 10px; height: 26px; background: var(--well); border-radius: 2px; position: relative; overflow: hidden; }
+.m i::after { content: ""; position: absolute; inset: auto 0 0 0; height: calc(var(--v, 0) * 100%); background: var(--holo); }
+.m.hit i::after { background: var(--brass); }
+.m b { font: 500 9px var(--f-mono); color: var(--muted); letter-spacing: .04em; }
+.timeline-wrap { position: relative; }
+#timeline { width: 100%; height: 64px; display: block; cursor: pointer; touch-action: none; }
+.legend { display: flex; gap: 16px; flex-wrap: wrap; color: var(--muted); font-size: 12px; }
+.legend span::before { content: ""; display: inline-block; width: 8px; height: 8px; margin-right: 6px; vertical-align: 0; }
+.legend .lg-sec::before { width: 2px; height: 11px; background: var(--brass); }
+.legend .lg-cut::before { border-left: 4px solid transparent; border-right: 4px solid transparent; border-top: 6px solid var(--text); width: 0; height: 0; }
+.legend .lg-big::before { border-left: 4px solid transparent; border-right: 4px solid transparent; border-top: 6px solid var(--brass); width: 0; height: 0; }
+
+/* buttons */
+.btn { border: 1px solid var(--line); background: var(--well); border-radius: 8px; padding: 7px 14px; cursor: pointer; font-weight: 500; }
+.btn:hover:not(:disabled) { border-color: var(--muted); }
+.btn.primary { background: var(--brass); color: var(--brass-ink); border-color: var(--brass); font-weight: 600; }
+.btn.primary:hover:not(:disabled) { filter: brightness(1.07); }
+.btn:disabled { opacity: .45; cursor: not-allowed; }
+.btn.ghost { background: transparent; }
+
+/* rail */
+.rail { display: flex; flex-direction: column; gap: 14px; min-width: 0; }
+.card { background: var(--panel); border: 1px solid var(--line); border-radius: var(--r); padding: 14px; display: flex; flex-direction: column; gap: 12px; min-width: 0; }
+.card h3 { margin: 0; font: 600 12px/1 var(--f-display); letter-spacing: .18em; text-transform: uppercase; color: var(--brass); }
+.row2 { display: flex; gap: 8px; flex-wrap: wrap; }
+.trackname { font-weight: 600; overflow-wrap: anywhere; }
+dl.stats { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 8px; margin: 0; }
+dl.stats div { background: var(--well); border-radius: 6px; padding: 6px 8px; }
+dl.stats dt { font-size: 11px; color: var(--muted); }
+dl.stats dd { margin: 0; font: 500 13px var(--f-mono); font-variant-numeric: tabular-nums; }
+.note { color: var(--muted); font-size: 12px; margin: 0; }
+
+ul.scenes { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 2px; }
+li.scene { display: grid; grid-template-columns: 34px 10px minmax(0, 1fr) auto auto auto; align-items: center; gap: 8px; padding: 5px 6px; border-radius: 6px; }
+li.scene.now { background: var(--well); }
+li.scene.off .nm, li.scene.off .num { opacity: .4; }
+li.scene .num { font: 600 12px var(--f-display); color: var(--muted); text-align: right; letter-spacing: .04em; }
+li.scene.now .num { color: var(--brass); }
+li.scene .sw { width: 10px; height: 10px; border-radius: 50%; background: var(--c); }
+li.scene .nm { display: flex; flex-direction: column; min-width: 0; line-height: 1.25; }
+li.scene .nm b { font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+li.scene .nm small { color: var(--muted); font: 400 10.5px var(--f-mono); }
+li.scene .ct { font: 500 11px var(--f-mono); color: var(--muted); min-width: 2.4em; text-align: right; font-variant-numeric: tabular-nums; }
+li.scene .pv { border: 1px solid var(--line); background: transparent; border-radius: 99px; font-size: 11px; padding: 1px 8px; cursor: pointer; color: var(--muted); }
+li.scene .pv[aria-pressed="true"] { border-color: var(--holo); color: var(--holo); }
+.sw-toggle { position: relative; width: 30px; height: 18px; display: inline-block; }
+.sw-toggle input { position: absolute; opacity: 0; inset: 0; margin: 0; cursor: pointer; }
+.sw-toggle span { position: absolute; inset: 0; background: var(--well); border: 1px solid var(--line); border-radius: 99px; pointer-events: none; transition: background .15s; }
+.sw-toggle span::after { content: ""; position: absolute; width: 12px; height: 12px; left: 2px; top: 2px; border-radius: 50%; background: var(--muted); transition: transform .15s, background .15s; }
+.sw-toggle input:checked + span { background: rgba(255,180,138,.2); border-color: var(--brass); }
+.sw-toggle input:checked + span::after { transform: translateX(12px); background: var(--brass); }
+.sw-toggle input:focus-visible + span { outline: 2px solid var(--holo); outline-offset: 2px; }
+
+.field { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 4px 10px; align-items: center; }
+.field label { font-size: 13px; }
+.field output { font: 500 12px var(--f-mono); color: var(--muted); font-variant-numeric: tabular-nums; }
+.field input[type=range] { grid-column: 1 / -1; width: 100%; accent-color: var(--brass); }
+.field select, .field input[type=number] { background: var(--well); border: 1px solid var(--line); border-radius: 6px; padding: 5px 8px; min-width: 0; }
+.checks { display: flex; flex-direction: column; gap: 6px; font-size: 13px; }
+.checks label { display: flex; gap: 8px; align-items: center; }
+.checks input { accent-color: var(--brass); }
+.grid2 { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+.grid2 .field { grid-template-columns: minmax(0, 1fr); }
+.prog { display: grid; gap: 6px; }
+.bar { height: 6px; border-radius: 3px; background: var(--well); position: relative; overflow: hidden; }
+.bar::after { content: ""; position: absolute; inset: 0 auto 0 0; width: var(--p, 0%); background: var(--brass); }
+.prog p { margin: 0; font: 400 12px var(--f-mono); color: var(--muted); }
+.save { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+.save span { font: 400 12px var(--f-mono); color: var(--muted); }
+@media (max-width: 640px) { .overlay p, .overlay .row { display: none; } .big { width: 56px; height: 56px; } .overlay h2 { font-size: 15px; } .meters { margin-left: 0; } }
+@media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+</style>
+
+<header class="top">
+  <div class="brand"><h1>Timewarp</h1><span>12 audio-reactive shaders, cut to your track</span></div>
+  <div class="status" id="status" role="status" aria-live="polite">Starting…</div>
+</header>
+<div class="busy" id="busyBar" hidden></div>
+
+<main class="studio">
+  <section class="stage-col" aria-label="Preview">
+    <div class="stage" id="stage">
+      <canvas id="view" width="960" height="540" aria-label="Shader preview"></canvas>
+      <div class="hud" id="hud"></div>
+      <button type="button" class="fs" id="fsBtn">Fullscreen</button>
+      <div class="overlay" id="overlay">
+        <div class="card">
+          <button type="button" class="big" id="bigPlay" aria-label="Play"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 4l14 8-14 8z"/></svg></button>
+          <h2 id="overlayTitle">Loading shaders</h2>
+          <p>Drop an audio file anywhere on this frame, or load one. Every scene is used before any repeats, and cuts land on the bar.</p>
+          <div class="row"><button type="button" class="btn" id="overlayFile">Load your track</button></div>
+        </div>
+      </div>
+    </div>
+    <div class="transport">
+      <button type="button" class="btn primary" id="playBtn" aria-pressed="false">Play</button>
+      <span class="clock" id="clock">0:00.0 / 0:00.0</span>
+      <span class="pill" id="bpm">— BPM</span>
+      <div class="meters" id="meters" aria-hidden="true">
+        <span class="m"><i></i><b>BASS</b></span><span class="m"><i></i><b>LOW</b></span><span class="m"><i></i><b>MID</b></span><span class="m"><i></i><b>HIGH</b></span><span class="m"><i></i><b>AIR</b></span>
+        <span class="m hit"><i></i><b>KICK</b></span><span class="m hit"><i></i><b>SNR</b></span><span class="m hit"><i></i><b>HAT</b></span>
+      </div>
+    </div>
+    <div class="timeline-wrap"><canvas id="timeline" aria-label="Scene timeline. Click to seek."></canvas></div>
+    <div class="legend"><span class="lg-sec">Section change (music shifts)</span><span class="lg-big">Big transition</span><span class="lg-cut">Cut on the bar</span><span id="planStats"></span></div>
+  </section>
+
+  <aside class="rail" aria-label="Controls">
+    <section class="card">
+      <h3>Track</h3>
+      <div class="trackname" id="trackName">—</div>
+      <div class="row2">
+        <button type="button" class="btn primary" id="fileBtn">Load audio file</button>
+        <button type="button" class="btn ghost" id="demoBtn">Demo beat</button>
+        <input type="file" id="file" accept="audio/*,.mp3,.wav,.m4a,.aac,.ogg,.flac,.opus" hidden>
+      </div>
+      <dl class="stats" id="trackStats"></dl>
+      <p class="note">The whole track is analyzed up front: five frequency bands, kick, snare and hat hits, the beat grid, and the points where the music changes.</p>
+    </section>
+
+    <section class="card">
+      <h3>Scenes</h3>
+      <ul class="scenes" id="sceneList"></ul>
+      <p class="note">“ref” is where each look appears in the source video. Solo previews one scene; the switch removes it from the cut.</p>
+    </section>
+
+    <section class="card">
+      <h3>Direction</h3>
+      <div class="grid2">
+        <div class="field"><label for="minSeg">Shortest scene</label><output id="minSegVal"></output><input type="range" id="minSeg" min="1" max="20" step="1"></div>
+        <div class="field"><label for="maxSeg">Longest scene</label><output id="maxSegVal"></output><input type="range" id="maxSeg" min="2" max="40" step="1"></div>
+      </div>
+      <div class="grid2">
+        <div class="field"><label for="cutOn">Cut on</label>
+          <select id="cutOn"><option value="beat">Any beat</option><option value="bar">Bar line</option><option value="phrase">Every 2 bars</option></select></div>
+        <div class="field"><label for="transStyle">Transitions</label>
+          <select id="transStyle"><option value="mixed">Mixed (like the video)</option><option value="smooth">Smooth</option><option value="hard">Hard cuts</option></select></div>
+      </div>
+      <div class="field"><label for="fxAmt">Hit effects (light bars, flares, glitch)</label><output id="fxAmtVal"></output><input type="range" id="fxAmt" min="0" max="1" step="0.05"></div>
+      <div class="field"><label for="react">Audio reactivity</label><output id="reactVal"></output><input type="range" id="react" min="0" max="2" step="0.05"></div>
+      <div class="checks">
+        <label><input type="checkbox" id="followSections"> Force a scene change when the music changes</label>
+        <label><input type="checkbox" id="energyMatch"> Match high-energy scenes to loud parts</label>
+      </div>
+      <div class="row2" style="align-items:center">
+        <button type="button" class="btn" id="shuffleBtn">Reshuffle</button>
+        <label for="seed" class="note">Seed</label><input type="number" id="seed" min="1" max="9999" style="width:84px;background:var(--well);border:1px solid var(--line);border-radius:6px;padding:5px 8px">
+      </div>
+    </section>
+
+    <section class="card">
+      <h3>Export</h3>
+      <div class="grid2">
+        <div class="field"><label for="res">Size</label>
+          <select id="res"><option value="1280x720">720p · 16:9</option><option value="1920x1080">1080p · 16:9</option><option value="2560x1440">1440p · 16:9</option><option value="3840x2160">4K · 16:9</option><option value="1080x1920">1080×1920 · 9:16</option><option value="1080x1350">1080×1350 · 4:5</option><option value="1080x1080">1080 square</option></select></div>
+        <div class="field"><label for="fps">Frame rate</label>
+          <select id="fps"><option value="30">30 fps</option><option value="60">60 fps</option></select></div>
+        <div class="field"><label for="mbps">Bitrate</label>
+          <select id="mbps"><option value="8">8 Mbps</option><option value="16">16 Mbps</option><option value="24">24 Mbps</option><option value="40">40 Mbps</option><option value="80">80 Mbps</option></select></div>
+        <div class="field"><label for="preview">Preview quality</label>
+          <select id="preview"><option value="0.35">Draft</option><option value="0.5">Half</option><option value="0.75">High</option><option value="1">Full</option></select></div>
+      </div>
+      <div class="row2">
+        <button type="button" class="btn primary" id="renderBtn">Render MP4 (frame-perfect)</button>
+        <button type="button" class="btn" id="recBtn">Record in real time</button>
+      </div>
+      <p class="note" id="renderNote">Frame-perfect renders every frame offline, so nothing drops even at 4K. Real-time recording plays the track through once and captures what you see.</p>
+      <div class="prog" id="exportProg" hidden>
+        <div class="bar" id="exportBar"></div>
+        <p id="exportText"></p>
+        <div><button type="button" class="btn ghost" id="cancelBtn" hidden>Cancel</button></div>
+      </div>
+      <div class="save" id="saveRow" hidden>
+        <button type="button" class="btn primary" id="saveBtn">Save video</button>
+        <span id="saveInfo"></span>
+      </div>
+    </section>
+  </aside>
+</main>
+
+<script>/*MUXER*/</script>
+<script>
+"use strict";
+/*SHADERS*/
+/*APP*/
+</script>
