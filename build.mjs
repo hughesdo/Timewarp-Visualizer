@@ -9,11 +9,14 @@ for (const f of fs.readdirSync(shaderDir).filter(f => f.endsWith('.glsl'))) {
   // strip // comments that are full-line and collapse blank lines (keeps line structure for error logs)
   shaders[f.replace('.glsl', '')] = fs.readFileSync(path.join(shaderDir, f), 'utf8');
 }
-const app = ['src/js/mathatlas.js', 'src/js/analysis.js', 'src/js/planner.js', 'src/js/renderer.js', 'src/js/audio.js', 'src/js/app.js'].map(rd).join('\n\n');
+const app = ['src/js/mathatlas.js', 'src/js/analysis.js', 'src/js/planner.js', 'src/js/renderer.js', 'src/js/audio.js', 'src/js/codecs.js', 'src/js/app.js'].map(rd).join('\n\n');
+// FFmpeg AAC-LC encoder as WASM, for browsers with no AAC encoder of their own (see vendor/AAC-ENCODER.md)
+const aac = rd('vendor/aac-wasm.js');
 let muxer = fs.existsSync(path.join(root, 'vendor/mp4-muxer.min.js')) ? rd('vendor/mp4-muxer.min.js') : rd('vendor/package/build/mp4-muxer.js');
 muxer = '/*! mp4-muxer 5.2.2 | MIT License | github.com/Vanilagy/mp4-muxer */\n' + muxer.replace('if (typeof module === "object" && typeof module.exports === "object") Object.assign(module.exports, Mp4Muxer)', '');
 let html = rd('src/template.html');
 html = html.replace('/*MUXER*/', () => muxer)
+  .replace('/*AACWASM*/', () => aac)
   .replace('/*SHADERS*/', () => 'const SHADERS = ' + JSON.stringify(shaders) + ';')
   .replace('/*APP*/', () => app);
 fs.mkdirSync(path.join(root, 'dist'), { recursive: true });

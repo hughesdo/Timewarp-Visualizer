@@ -15,7 +15,7 @@ const S = {
   cfg: Object.assign({ enabled: SCENES.map((_, i) => i), minSeg: 4, maxSeg: 10, cutOn: 'bar', transStyle: 'mixed', fx: 0.6, react: 1.0, seed: 1, followSections: true, energyMatch: true }, store.get('cfg', {})),
   out: Object.assign({ res: '1920x1080', fps: 60, mbps: 16, preview: 0.5 }, store.get('out', {})),
   solo: null, recording: false, exporting: false, cancel: false, dirty: true, ready: false,
-  lastBlob: null,
+  lastBlob: null, canRender: typeof VideoEncoder !== 'undefined',
 };
 S.cfg.enabled = S.cfg.enabled.filter(i => i >= 0 && i < SCENES.length);
 if (!S.cfg.enabled.length) S.cfg.enabled = SCENES.map((_, i) => i);
@@ -81,6 +81,7 @@ async function useBuffer(buf, name, isDemo) {
   }
   $('#bpm').textContent = `${A.bpm.toFixed(0)} BPM`;
   replan();
+  updateEstimate();
   status(isDemo ? 'Demo beat loaded. Press play, or load your own track.' : `Loaded “${name}”. Press play to preview.`);
   $('#overlay').hidden = false;
   $('#overlayTitle').textContent = isDemo ? 'Demo beat ready' : name;
@@ -280,7 +281,7 @@ async function recordRealtime() {
   const vs = R.canvas.captureStream(S.out.fps);
   const as = player.recordStream();
   const stream = new MediaStream([...vs.getVideoTracks(), ...as.getAudioTracks()]);
-  const rec = new MediaRecorder(stream, { mimeType: mime, videoBitsPerSecond: S.out.mbps * 1e6, audioBitsPerSecond: 256000 });
+  const rec = new MediaRecorder(stream, { mimeType: mime, videoBitsPerSecond: S.out.mbps * 1e6, audioBitsPerSecond: 192000 });
   const chunks = [];
   rec.ondataavailable = (e) => { if (e.data && e.data.size) chunks.push(e.data); };
   S.recording = true; S.cancel = false; setExportUI(true, 'Recording in real time…');
@@ -301,56 +302,59 @@ async function recordRealtime() {
   player.onEnded = () => { updateTransport(); S.dirty = true; };
   S.recording = false; updateTransport();
   if (S.cancel) { setExportUI(false); status('Recording cancelled.'); return; }
-  const ext = mime.includes('mp4') ? 'mp4' : 'webm';
-  finishExport(new Blob(chunks, { type: mime.split(';')[0] }), ext);
+  const info = Object.assign(describeRecorderMime(mime), { realtime: true });
+  finishExport(new Blob(chunks, { type: mime.split(';')[0] }), info.container, info);
 }
 
 // ------------------------------------------------------------ export: frame-perfect (WebCodecs)
-async function resample(buf, sr) {
-  const ch = Math.min(2, buf.numberOfChannels);
-  const oc = new OfflineAudioContext(ch, Math.ceil(buf.duration * sr), sr);
-  const s = oc.createBufferSource(); s.buffer = buf; s.connect(oc.destination); s.start();
-  return await oc.startRendering();
-}
 async function exportFramePerfect() {
   if (!S.A || S.exporting || S.recording) return;
   const [w, h] = outSize(), fps = S.out.fps;
-  const enc = await pickEncoderConfig(w, h, fps, S.out.mbps * 1e6);
+  const enc = await pickVideoEncoder(w, h, fps, S.out.mbps * 1e6);
   if (!enc) { status('Frame-perfect export needs WebCodecs (Chrome or Edge). Use real-time recording here.', 'error'); return; }
   player.pause(); updateTransport();
   S.solo = null; renderSceneList();
-  S.exporting = true; S.cancel = false; setExportUI(true, 'Preparing encoder…');
-  let fail = null;
+  S.exporting = true; S.cancel = false; setExportUI(true, 'Preparing audio…');
+  const isCancelled = () => S.cancel;
+  let fail = null, ve = null;
   try {
-    let abuf = player.buffer;
-    if (abuf.numberOfChannels > 2) abuf = await resample(abuf, abuf.sampleRate);
-    let acfg = await pickAudioConfig(abuf.sampleRate, abuf.numberOfChannels);
-    if (!acfg) { abuf = await resample(abuf, 48000); acfg = await pickAudioConfig(48000, abuf.numberOfChannels); }
+    // Audio first. This is the part X is strict about: AAC-LC, 44.1 or 48 kHz, mono or stereo.
+    const abuf = await exportAudioBuffer(player.buffer);
+    let ap = await pickAudioPath(abuf.sampleRate, abuf.numberOfChannels);
+    if (!ap) throw new Error('this browser can’t encode audio, so the video would be silent. Use Chrome or Edge, or Record in real time');
+    const aProg = (p) => {
+      const name = ap.mux === 'aac' ? (ap.kind === 'wasm' ? 'AAC, built-in encoder' : 'AAC') : 'Opus';
+      $('#exportBar').style.setProperty('--p', Math.round(p * 100) + '%');
+      $('#exportText').textContent = `Encoding audio (${name}) · ${Math.round(p * 100)}%`;
+    };
+    let achunks;
+    try {
+      achunks = ap.kind === 'wasm' ? await encodeAacWasm(abuf, aProg, isCancelled) : await encodeAudioNative(abuf, ap.cfg, aProg, isCancelled);
+    } catch (e) {
+      // A native AAC encoder that passes the support check but fails anyway (Windows N without
+      // Media Foundation, for one) falls back to the built-in encoder instead of failing the render.
+      if (e.cancelled || !(ap.kind === 'native' && ap.mux === 'aac') || !(await loadAacWasm())) throw e;
+      console.warn('Native AAC encoder failed, using the built-in one:', e);
+      ap = { kind: 'wasm', mux: 'aac' };
+      achunks = await encodeAacWasm(abuf, aProg, isCancelled);
+    }
+
     const target = new Mp4Muxer.ArrayBufferTarget();
     const muxer = new Mp4Muxer.Muxer({
       target,
       video: { codec: enc.muxCodec, width: w, height: h, frameRate: fps },
-      audio: acfg ? { codec: acfg.mux, numberOfChannels: abuf.numberOfChannels, sampleRate: abuf.sampleRate } : undefined,
+      audio: { codec: ap.mux, numberOfChannels: abuf.numberOfChannels, sampleRate: abuf.sampleRate },
       fastStart: 'in-memory', firstTimestampBehavior: 'offset',
     });
-    // audio
-    if (acfg) {
-      const ae = new AudioEncoder({ output: (c, m) => muxer.addAudioChunk(c, m), error: (e) => { fail = e; } });
-      ae.configure(acfg.cfg);
-      const CH = abuf.numberOfChannels, SR = abuf.sampleRate, N = 4096;
-      const chans = []; for (let c = 0; c < CH; c++) chans.push(abuf.getChannelData(c));
-      for (let i = 0; i < abuf.length && !fail; i += N) {
-        const n = Math.min(N, abuf.length - i);
-        const data = new Float32Array(n * CH);
-        for (let c = 0; c < CH; c++) data.set(chans[c].subarray(i, i + n), c * n);
-        const ad = new AudioData({ format: 'f32-planar', sampleRate: SR, numberOfFrames: n, numberOfChannels: CH, timestamp: Math.round(i / SR * 1e6), data });
-        ae.encode(ad); ad.close();
-        if (ae.encodeQueueSize > 32) await new Promise(r => setTimeout(r, 0));
-      }
-      await ae.flush(); ae.close();
-    }
-    // video
-    const ve = new VideoEncoder({ output: (c, m) => muxer.addVideoChunk(c, m), error: (e) => { fail = e; } });
+    // interleave: give the muxer audio up to wherever the video has reached
+    let ai = 0;
+    const feedAudio = (untilUs) => {
+      while (ai < achunks.length && achunks[ai].t <= untilUs) { const c = achunks[ai++]; muxer.addAudioChunkRaw(c.d, 'key', c.t, c.dur, c.meta); }
+    };
+    ve = new VideoEncoder({
+      output: (c, m) => { try { muxer.addVideoChunk(c, m); feedAudio(c.timestamp + (c.duration || 0)); } catch (e) { fail = fail || e; } },
+      error: (e) => { fail = fail || e; },
+    });
     ve.configure(enc.cfg);
     const total = Math.ceil(S.A.duration * fps);
     const t0 = performance.now();
@@ -371,16 +375,20 @@ async function exportFramePerfect() {
         await new Promise(r => setTimeout(r, 0));
       }
     }
-    if (S.cancel) { try { ve.close(); } catch (e) {} throw new Error('cancelled'); }
-    await ve.flush(); ve.close();
+    if (S.cancel) throw cancelError();
+    await ve.flush(); ve.close(); ve = null;
     if (fail) throw fail;
+    feedAudio(Infinity);
     muxer.finalize();
     S.exporting = false;
-    finishExport(new Blob([target.buffer], { type: 'video/mp4' }), 'mp4');
+    finishExport(new Blob([target.buffer], { type: 'video/mp4' }), 'mp4', {
+      container: 'mp4', video: enc.label, audio: ap.mux === 'aac' ? 'AAC' : 'Opus', audioKind: ap.kind,
+    });
   } catch (e) {
+    if (ve) { try { ve.close(); } catch (x) {} }
     S.exporting = false;
     setExportUI(false);
-    if (String(e && e.message) === 'cancelled') status('Render cancelled.');
+    if (e && e.cancelled) status('Render cancelled.');
     else { status(`Render failed: ${e && e.message ? e.message : e}`, 'error'); console.error(e); }
   }
   S.dirty = true;
@@ -390,18 +398,74 @@ function setExportUI(on, text) {
   $('#exportProg').hidden = !on;
   $('#exportText').textContent = text || '';
   $('#exportBar').style.setProperty('--p', '0%');
-  for (const id of ['#recBtn', '#renderBtn', '#fileBtn', '#demoBtn', '#playBtn']) $(id).disabled = on;
+  for (const id of ['#recBtn', '#fileBtn', '#demoBtn', '#playBtn']) $(id).disabled = on;
+  $('#renderBtn').disabled = on || !S.canRender;
   $('#cancelBtn').hidden = !on;
   updateTransport();
 }
-function finishExport(blob, ext) {
+function finishExport(blob, ext, info) {
   setExportUI(false);
   S.lastBlob = blob; S.lastExt = ext;
   const mb = (blob.size / 1048576).toFixed(1);
+  const codecs = info.unknown ? '' : ` · ${info.video} + ${info.audio}`;
   $('#saveRow').hidden = false;
-  $('#saveInfo').textContent = `${ext.toUpperCase()} · ${mb} MB · ${S.out.res.replace('x', '×')} · ${S.out.fps} fps`;
-  status('Video ready. Save it below.');
+  $('#saveInfo').textContent = `${ext.toUpperCase()}${codecs} · ${mb} MB · ${S.out.res.replace('x', '×')} · ${S.out.fps} fps`;
+  const v = xVerdict(info);
+  renderChips($('#saveChips'), [v, ...xLimitChips(S.A.duration, blob.size)]);
+  if (v.level === 'ok') status('Video ready. Save it below.');
+  else status(`Video ready, but: ${v.text}. Details below.`, v.level === 'bad' ? 'error' : '');
 }
+
+// ------------------------------------------------------------ export guidance (estimate, pre-flight, chips)
+function renderChips(el, chips) {
+  el.replaceChildren(...chips.map((c) => {
+    const b = document.createElement('button');
+    b.type = 'button'; b.className = 'chip'; b.dataset.level = c.level;
+    b.textContent = c.text; b.title = c.tip; b.setAttribute('aria-label', `${c.text}. ${c.tip}`);
+    b.addEventListener('click', openXHelp);
+    return b;
+  }));
+  el.hidden = !chips.length;
+}
+function openXHelp() { const d = $('#xHelp'); d.open = true; d.scrollIntoView({ block: 'nearest', behavior: 'smooth' }); }
+const fmtSize = (b) => b >= 1073741824 ? `${(b / 1073741824).toFixed(1)} GB` : `${Math.max(1, Math.round(b / 1048576))} MB`;
+const fmtLen = (t) => { const s = Math.round(t); return `${Math.floor(s / 60)}:${String(s % 60).padStart(2, '0')}`; };
+function updateEstimate() {
+  if (!S.A) return;
+  const [w, h] = outSize(), secs = S.A.duration;
+  const bytes = (S.out.mbps * 1e6 + 192000) * secs / 8;
+  $('#estimate').textContent = `About ${fmtSize(bytes)} · ${fmtLen(secs)} · ${w}×${h} · ${S.out.fps} fps`;
+  renderChips($('#estChips'), xLimitChips(secs, bytes));
+}
+let preflightSeq = 0;
+async function updatePreflight() {
+  const seq = ++preflightSeq;
+  const [w, h] = outSize();
+  const p = await probeExport(w, h, S.out.fps, S.out.mbps * 1e6);
+  if (seq !== preflightSeq) return;
+  let level = 'ok', text, tip;
+  if (!p.video) {
+    level = 'bad'; text = 'Render MP4 isn’t available in this browser';
+    tip = 'Frame-perfect rendering needs WebCodecs (Chrome or Edge). Real-time recording still works.';
+  } else if (!p.audio) {
+    level = 'bad'; text = 'No audio encoder here, so renders are off';
+    tip = 'This browser can’t encode audio, and a render would come out silent. Use Chrome or Edge, or Record in real time.';
+  } else if (p.video !== 'H.264' || p.audio !== 'AAC') {
+    level = 'warn'; text = `Writes ${p.video} + ${p.audio} · not X-ready`;
+    tip = 'This browser can’t write the H.264 + AAC combination X needs. The MP4 will play in VLC and browsers, but X will refuse it. Render in Chrome or Edge on Windows or Mac.';
+  } else if (p.audioKind === 'wasm') {
+    text = 'Writes H.264 + AAC (built-in encoder) · X-ready';
+    tip = 'This browser has no AAC encoder of its own, so Timewarp uses the one built into this page. Audio takes a few extra seconds to encode.';
+  } else {
+    text = 'Writes H.264 + AAC · X-ready';
+    tip = 'MP4 with H.264 video and AAC-LC audio, the format X recommends.';
+  }
+  S.canRender = !!(p.video && p.audio);
+  if (!S.exporting && !S.recording) $('#renderBtn').disabled = !S.canRender;
+  const el = $('#preflight');
+  el.dataset.level = level; el.textContent = text; el.title = tip;
+}
+
 async function saveLast() {
   if (!S.lastBlob) return;
   const base = (S.name || 'timewarp').replace(/[^\w\- .]+/g, '').trim() || 'timewarp';
@@ -435,7 +499,12 @@ function bindSettings() {
   const sel = (id, key, obj = 'cfg', cast = (v) => v) => {
     const el = $('#' + id);
     el.value = String(S[obj][key]);
-    el.addEventListener('change', () => { S[obj][key] = cast(el.value); store.set(obj, S[obj]); if (obj === 'cfg') replan(); applyAspect(); S.dirty = true; });
+    el.addEventListener('change', () => {
+      S[obj][key] = cast(el.value); store.set(obj, S[obj]);
+      if (obj === 'cfg') replan();
+      if (obj === 'out' && key !== 'preview') { updateEstimate(); updatePreflight(); }
+      applyAspect(); S.dirty = true;
+    });
   };
   sel('cutOn', 'cutOn');
   sel('transStyle', 'transStyle');
@@ -494,6 +563,8 @@ async function boot() {
     else if (e.code === 'ArrowLeft' && S.A && !S.recording && !S.exporting) { player.seek(player.time() - 5); S.dirty = true; }
   });
   if (typeof VideoEncoder === 'undefined') { $('#renderBtn').disabled = true; $('#renderNote').textContent = 'Frame-perfect render needs Chrome or Edge (WebCodecs). Real-time recording works here.'; }
+  const recMime = pickRecorderMime();
+  if (recMime && !/^video\/mp4/.test(recMime)) $('#recBtn').title += ' This browser records WebM, which X won’t accept.';
 
   status('Compiling shaders…');
   progress(0);
@@ -509,5 +580,6 @@ async function boot() {
   await loadDemo();
   player.offset = Math.min(S.A.duration * 0.33, 8.2);
   S.dirty = true;
+  updatePreflight();
 }
 boot();

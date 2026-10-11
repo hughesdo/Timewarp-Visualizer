@@ -20,5 +20,12 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 
-Bundled third-party code: mp4-muxer 5.2.2 by Vanilagy, MIT License
-(https://github.com/Vanilagy/mp4-muxer), included in timewarp.html and vendor/.
+Bundled third-party code, included in timewarp.html and vendor/:
+
+- mp4-muxer 5.2.2 by Vanilagy, MIT License (https://github.com/Vanilagy/mp4-muxer).
+- AAC encoder (vendor/aac-wasm.js), kept in its own <script> block:
+  FFmpeg libavcodec AAC encoder compiled to WebAssembly, LGPL-2.1-or-later
+  (https://ffmpeg.org), with the bridge from @mediabunny/aac-encoder 1.61.3 by
+  Vanilagy, MPL-2.0 (https://github.com/Vanilagy/mediabunny). These two keep
+  their own licenses, not MIT. License texts are in vendor/licenses/, and
+  source and build steps are in vendor/AAC-ENCODER.md.

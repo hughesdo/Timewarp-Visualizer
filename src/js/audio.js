@@ -113,33 +113,17 @@ async function synthDemo() {
   return await oc.startRendering();
 }
 
+// Real-time recording: MP4 with H.264 + AAC where the browser can, otherwise WebM (which X won't take).
 function pickRecorderMime() {
   const c = ['video/mp4;codecs=avc1.640028,mp4a.40.2', 'video/mp4;codecs=avc1.4d0028,mp4a.40.2', 'video/mp4;codecs=avc1,mp4a', 'video/webm;codecs=vp9,opus', 'video/webm;codecs=vp8,opus', 'video/webm', 'video/mp4'];
   if (typeof MediaRecorder === 'undefined') return null;
   for (const m of c) { try { if (MediaRecorder.isTypeSupported(m)) return m; } catch (e) {} }
   return null;
 }
-
-async function pickEncoderConfig(w, h, fps, bitrate) {
-  if (typeof VideoEncoder === 'undefined' || typeof Mp4Muxer === 'undefined') return null;
-  const px = w * h;
-  const avc = px > 2228224 ? ['avc1.640033', 'avc1.640034'] : px > 983040 ? ['avc1.640028', 'avc1.64002a', 'avc1.4d0028'] : ['avc1.64001f', 'avc1.640028', 'avc1.42001f'];
-  for (const codec of avc) {
-    const cfg = { codec, width: w, height: h, bitrate, framerate: fps, latencyMode: 'quality', avc: { format: 'avc' } };
-    try { const r = await VideoEncoder.isConfigSupported(cfg); if (r.supported) return { cfg, muxCodec: 'avc' }; } catch (e) {}
-  }
-  for (const codec of ['vp09.00.40.08', 'vp09.00.10.08']) {
-    const cfg = { codec, width: w, height: h, bitrate, framerate: fps, latencyMode: 'quality' };
-    try { const r = await VideoEncoder.isConfigSupported(cfg); if (r.supported) return { cfg, muxCodec: 'vp9' }; } catch (e) {}
-  }
-  return null;
-}
-
-async function pickAudioConfig(sr, ch) {
-  if (typeof AudioEncoder === 'undefined') return null;
-  for (const [codec, mux] of [['mp4a.40.2', 'aac'], ['opus', 'opus']]) {
-    const cfg = { codec, sampleRate: sr, numberOfChannels: ch, bitrate: 256000 };
-    try { const r = await AudioEncoder.isConfigSupported(cfg); if (r.supported) return { cfg, mux }; } catch (e) {}
-  }
-  return null;
+// What a recorder MIME type means for posting.
+function describeRecorderMime(mime) {
+  const mp4 = /^video\/mp4/.test(mime);
+  const video = /avc1/.test(mime) ? 'H.264' : /vp9/.test(mime) ? 'VP9' : /vp8/.test(mime) ? 'VP8' : null;
+  const audio = /mp4a/.test(mime) ? 'AAC' : /opus/.test(mime) ? 'Opus' : null;
+  return { container: mp4 ? 'mp4' : 'webm', video, audio, unknown: !video || !audio };
 }

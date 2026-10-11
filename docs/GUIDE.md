@@ -2,6 +2,8 @@
 
 Oct 11, 2026 · @Don Hughes
 
+> **Beta.** Timewarp is still being tested across browsers, GPUs and computers. If a render or upload goes wrong, please [open an issue on GitHub](https://github.com/hughesdo/Timewarp-Visualizer/issues) with your browser, OS and what happened.
+
 ## What this is
 
 Don gave Claude a 30-second AI-generated music video and one long message. In about an hour, Claude turned it into a single web page that makes a new music video from any song you give it.
@@ -10,7 +12,7 @@ Claude watched the video frame by frame, split it into its different looks, and 
 
 Three things came out of the session:
 
-- **The web page, Timewarp Visualizer.** Load a song, press play, and it runs 12 scenes that react to the music, then exports an MP4. It is one HTML file of about 185 KB that runs offline, plus a shareable link version.
+- **The web page, Timewarp Visualizer.** Load a song, press play, and it runs 12 scenes that react to the music, then exports an MP4. It is one HTML file of about 890 KB that runs offline, plus a shareable link version.
 
 - **The shader source code.** All 12 scenes plus the transition and glow effects, in a zip with a readme.
 
@@ -235,13 +237,21 @@ Each colored block is one scene, labeled with its Roman numeral. Peach vertical 
 | Bitrate                                     | Video quality, 8 to 80 Mbps. 16 is a good default for 1080p, 40 or more for 4K.                                           |
 | Preview quality                             | Draft, Half, High or Full. Lower it if the preview stutters. It doesn't affect the export.                                |
 
-The page remembers your settings in that browser.
+The page remembers your settings in that browser. Hover over any export setting for a short explanation of what it does.
+
+Under the settings, the Export card shows:
+
+- **A size estimate** for the finished file, worked out from the bitrate and the song's length. A small tag appears when the video is past what a free X account can post (2 minutes 20 seconds, or 512 MB). Click a tag for details.
+- **What your browser will write**, checked before you render. A cyan dot with "H.264 + AAC · X-ready" means you're set. An amber or red dot means this browser can't make a file X will take, and says why.
+- **Posting to X**, a panel that opens with a click and explains X's limits for free and Premium accounts.
 
 ### The two ways to export
 
-- **Render MP4 (frame-perfect)** builds every frame one at a time, so nothing is ever dropped, even at 4K. It can run faster or slower than the song depending on your computer. It needs Chrome or Edge.
+- **Render MP4 (frame-perfect)** builds every frame one at a time, so nothing is ever dropped, even at 4K. It can run faster or slower than the song depending on your computer. It needs Chrome or Edge. Use this for anything you'll post.
 
-- **Record in real time** plays the song through once and records what's on screen. It works in more browsers, but a slow computer can drop frames, and you should keep the tab in front while it records.
+- **Record in real time** plays the song through once and records what's on screen. It works in more browsers, but a slow computer can drop frames, and you should keep the tab in front while it records. Some browsers save these recordings as WebM, which X won't accept.
+
+When the video is ready, the line next to Save video lists its format and size, with a tag saying whether it's X-ready.
 
 On the shared link, "Save video" asks you to confirm the download. In the HTML file it downloads directly.
 
@@ -369,7 +379,9 @@ The page works end to end, but it was tested in a cloud browser without a real g
 
 - **Browsers.** Frame-perfect MP4 needs Chrome or Edge. Firefox and Safari can use real-time recording only. Phones aren't a good fit.
 
-- **Video format.** Chrome and Edge on Windows and Mac write standard H.264 video with AAC audio. Where those aren't available, such as some Linux builds, the MP4 uses VP9 and Opus instead, which plays in VLC and browsers but not QuickTime.
+- **Video format.** Render MP4 writes H.264 video with AAC-LC audio, the format X asks for. The audio is always AAC: Chrome and Edge on Windows and Mac use their own encoder, and browsers without one (Chrome on Linux, Firefox) use an encoder built into the page. If a browser can't encode H.264, the video falls back to VP9, which plays in VLC and browsers but not on X or QuickTime. The Export card warns you before you render.
+
+- **Audio sync.** The sound sits about 21 ms behind the picture. Every AAC encoder adds this short start-up delay. It's about one frame at 60 fps, below what anyone can see.
 
 - **Real-time recordings.** A slow computer can drop frames. If the browser can only record WebM, some players show no running time for the file.
 
@@ -384,6 +396,8 @@ The page works end to end, but it was tested in a cloud browser without a real g
 - **Characters and logos.** Claude won't redraw a recognizable character or logo that belongs to someone else, so the goggle cat became the abstract Twin Lenses. If something in your video is your own creation, tell Claude.
 
 - **Big exports.** A long song at 4K and a high bitrate makes a large file. Keep enough free space, and use 1080p for quick tests.
+
+- **Posting to X.** Free X accounts can post up to 2 minutes 20 seconds and 512 MB. X Premium allows up to 4 hours and 16 GB on the web. These are X's rules, not the page's, and X changes them from time to time; see [help.x.com](https://help.x.com/en/using-x/x-videos).
 
 ## For the curious: technical appendix
 
@@ -442,6 +456,8 @@ Section changes become fixed cuts. The gaps between them are split into random l
 ### How the export works
 
 - **Frame-perfect:** the browser's WebCodecs encoder plus the open-source mp4-muxer library (version 5.2.2, MIT license), which is built into the file. Each frame is rendered at the exact time it belongs to, encoded, and packed with the song into an MP4.
+
+- **Audio for the MP4:** the song is converted to 44.1 or 48 kHz and at most two channels, then encoded as AAC-LC at 192 kbps stereo or 128 kbps mono. Those are the only rates Chrome's Windows encoder accepts. Browsers with no AAC encoder use FFmpeg's AAC encoder, compiled to WebAssembly and built into the page (LGPL-2.1+, with a bridge from @mediabunny/aac-encoder under MPL-2.0; see `vendor/AAC-ENCODER.md`).
 
 - **Real time:** the browser's MediaRecorder captures the canvas and the audio together as the song plays.
 
