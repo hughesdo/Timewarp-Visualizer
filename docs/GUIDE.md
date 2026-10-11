@@ -2,7 +2,7 @@
 
 Oct 11, 2026 · @Don Hughes
 
-> **Beta.** Timewarp is still being tested across browsers, GPUs and computers. If a render or upload goes wrong, please [open an issue on GitHub](https://github.com/hughesdo/Timewarp-Visualizer/issues) with your browser, OS and what happened.
+> **Alpha.** Timewarp is an early release, and two people have tested it so far, so expect rough edges. If a render or upload goes wrong, please [open an issue on GitHub](https://github.com/hughesdo/Timewarp-Visualizer/issues) with your browser, OS and what happened.
 
 ## What this is
 
@@ -12,9 +12,9 @@ Claude watched the video frame by frame, split it into its different looks, and 
 
 Three things came out of the session:
 
-- **The web page, Timewarp Visualizer.** Load a song, press play, and it runs 12 scenes that react to the music, then exports an MP4. It is one HTML file of about 890 KB that runs offline, plus a shareable link version.
+- **The web page, Timewarp Visualizer.** Load a song, press play, and it runs 12 scenes that react to the music, then exports an MP4. It is one HTML file of about 885 KB that runs offline, and it's also online as a live page.
 
-- **The shader source code.** All 12 scenes plus the transition and glow effects, in a zip with a readme.
+- **The shader source code.** All 12 scenes plus the transition and glow effects, in the repo's `shaders` folder with a readme.
 
 - **A repeatable method.** This document. You can follow it with your own video, either from scratch or by reusing this page as the engine.
 
@@ -117,7 +117,7 @@ Claude worked in its own cloud workspace, a private computer where it can run pr
 
 8.  **Built the engine around the shaders.** This covered the song analyzer, the automatic editor that plans the cuts, the transitions and hit effects, the glow, the controls, and the two ways to export. Section 6 explains how these work.
 
-9.  **Tested the whole page.** Claude generated a demo beat inside the page at a known 124 BPM, with 4 deliberate section changes, then checked the points below. (The demo beat was later taken out of the page, so nobody renders it by mistake.)
+9.  **Tested the whole page.** Claude generated a test beat at a known 124 BPM, with 4 deliberate section changes, then checked:
 
     - The analyzer measured 124.1 BPM and found all 4 section changes.
 
@@ -251,7 +251,7 @@ Under the settings, the Export card shows:
 
 When the video is ready, the line next to Save video lists its format and size, with a tag saying whether it's X-ready.
 
-On the shared link, "Save video" asks you to confirm the download. In the HTML file it downloads directly.
+"Save video" downloads the file straight to your computer, from the live page or the HTML file.
 
 ## Doing it yourself with your own video
 
@@ -371,11 +371,11 @@ A few habits that help:
 
 ## Limits and honest notes
 
-The page works end to end, but it was tested in a cloud browser without a real graphics card, so speed on your computer is the main unknown.
+This is an alpha release. Two people have tested it on their own computers so far, and its MP4 files have been checked against X's video requirements. How fast it runs on other computers and graphics cards is the main unknown.
 
 - **Speed.** The shaders are fairly heavy. On a decent desktop or gaming laptop they should run smoothly at 1080p. On an older laptop, set Preview quality to Draft. The frame-perfect render is never affected by stutter, it just takes longer.
 
-- **Browsers.** Frame-perfect MP4 needs Chrome or Edge. Firefox and Safari can use real-time recording only. Phones aren't a good fit.
+- **Browsers.** Frame-perfect MP4 needs Chrome or Edge. Other browsers may only offer real-time recording; the Export card tells you what yours can do. Phones aren't a good fit.
 
 - **Video format.** Render MP4 writes H.264 video with AAC-LC audio, the format X asks for. The audio is always AAC: Chrome and Edge on Windows and Mac use their own encoder, and browsers without one (Chrome on Linux, Firefox) use an encoder built into the page. If a browser can't encode H.264, the video falls back to VP9, which plays in VLC and browsers but not on X or QuickTime. The Export card warns you before you render.
 
@@ -384,10 +384,6 @@ The page works end to end, but it was tested in a cloud browser without a real g
 - **Real-time recordings.** A slow computer can drop frames. If the browser can only record WebM, some players show no running time for the file.
 
 - **Chalk font.** The handwritten formulas use a free Google font, Caveat. Offline, they fall back to a plain serif font.
-
-- **Saving from the shared link.** On the claude.ai link, Save asks you to confirm the download. That prompt wasn't testable from Claude's side. If Save does nothing there, use the HTML file.
-
-- **Sharing.** The artifact link is private until its owner turns on sharing from the Share menu.
 
 - **Look, not copy.** The scenes recreate the style of the source in code. They are not pixel copies of the video, and they move differently.
 
@@ -401,7 +397,7 @@ The page works end to end, but it was tested in a cloud browser without a real g
 
 Skip this unless you want to read or change the code. Everything lives in timewarp.html, with no installs and no server.
 
-### The shader files (in the zip)
+### The shader files (in the shaders folder)
 
 Each scene is built by joining common.glsl, any library it uses, and its own scene file, then drawing it across the whole screen.
 

@@ -1,6 +1,6 @@
 # Timewarp Visualizer
 
-> **Beta.** Timewarp is still being tested across browsers, GPUs and computers. If a render or upload goes wrong, please [open an issue](https://github.com/hughesdo/Timewarp-Visualizer/issues) with your browser, OS and what happened.
+> **Alpha.** Timewarp is an early release, and two people have tested it so far, so expect rough edges. If a render or upload goes wrong, please [open an issue on GitHub](https://github.com/hughesdo/Timewarp-Visualizer/issues) with your browser, OS and what happened.
 
 **Turn any song into an audio-reactive shader music video.** Load a track, and the page analyzes it, cuts between 12 GLSL scenes on the beat, and exports an MP4 with your song as the soundtrack. Everything runs in one HTML file in your browser. Nothing is uploaded and nothing needs installing.
 
@@ -37,7 +37,7 @@ The original AI video, [`source/time.mp4`](source/time.mp4), is by @StarlitBeRog
 
 | Path | What it is | Do you need it? |
 | --- | --- | --- |
-| `timewarp.html` | The whole app in one file, about 890 KB. Shaders, analysis, editor, exporter and a built-in AAC encoder are all inside it. | **Yes. This is the app.** |
+| `timewarp.html` | The whole app in one file, about 885 KB. Shaders, analysis, editor, exporter and a built-in AAC encoder are all inside it. | **Yes. This is the app.** |
 | `index.html` | An identical copy, so GitHub Pages serves the app at the repo's address. | No |
 | `docs/GUIDE.md` | The full guide: the starting prompt, every step Claude took, the scene breakdown, and how to do it with your own video. Written for beginners. | Recommended reading |
 | `docs/AI-Video-to-Shader-Music-Video-Guide.docx` | The same guide as a Word file. | Optional |
@@ -108,7 +108,7 @@ This writes `dist/timewarp-standalone.html`. Copy it over `timewarp.html` and `i
 - Audio is always AAC: the browser's own encoder where it has one (Chrome and Edge on Windows and Mac), otherwise the encoder built into the page (Chrome on Linux, Firefox). Where H.264 video isn't available, the MP4 falls back to VP9, which plays in VLC and browsers but not on X or QuickTime. The Export card warns you first.
 - Sound sits about 21 ms behind the picture, the start-up delay every AAC encoder adds. That's about one frame at 60 fps, well under what anyone can see.
 - The handwritten chalk formulas use the Google font Caveat and fall back to a serif font offline.
-- Tested end to end in a headless browser with software rendering, not yet on a wide range of real GPUs. Issues and reports are welcome.
+- Alpha: two people have tested it on their own computers so far. It hasn't been tried on a wide range of graphics cards and browsers yet. Issues and reports are welcome.
 
 ## License
 

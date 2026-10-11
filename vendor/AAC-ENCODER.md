@@ -2,7 +2,7 @@
 
 `aac-wasm.js` is an AAC-LC audio encoder that runs in the page as WebAssembly. Timewarp uses it only when the browser has no AAC encoder of its own (Chrome on Linux, Firefox, some Windows N editions). Chrome and Edge on Windows and Mac use their native encoder and never load it.
 
-It exists so every Render MP4 comes out with AAC audio, which X requires. Without it, those browsers fell back to Opus audio, and X refuses Opus.
+It makes sure every Render MP4 has AAC audio, which X requires. Without it, those browsers could only write Opus audio, which X refuses.
 
 ## What it is
 
