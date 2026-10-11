@@ -10,6 +10,10 @@ The 12 scenes were rebuilt by Claude from a 30-second AI-generated music video. 
 
 ![Six of the twelve scenes](docs/scenes-grid.png)
 
+The source video next to the shader rebuild (left: original frames, right: shaders):
+
+![Reference frames next to the shader versions](docs/reference-vs-shader.png)
+
 ## Credits
 
 - **Teacher:** Don Hughes, [@OneHung on X](https://x.com/OneHung). Wrote the prompt, directed the build with Claude, and shares it here for free.
@@ -17,7 +21,7 @@ The 12 scenes were rebuilt by Claude from a 30-second AI-generated music video. 
 - **Built with:** Claude by Anthropic.
 - **MP4 writing:** [mp4-muxer](https://github.com/Vanilagy/mp4-muxer) by Vanilagy (MIT), bundled into the page.
 
-The source video is not included in this repo. It belongs to its creator.
+The original AI video, [`source/time.mp4`](source/time.mp4), is by @StarlitBeRogue and is shared here with her permission. Please credit her if you use it.
 
 ## Quick start
 
@@ -35,6 +39,7 @@ The source video is not included in this repo. It belongs to its creator.
 | `docs/GUIDE.md` | The full guide: the starting prompt, every step Claude took, the scene breakdown, and how to do it with your own video. Written for beginners. | Recommended reading |
 | `docs/AI-Video-to-Shader-Music-Video-Guide.docx` | The same guide as a Word file. | Optional |
 | `shaders/` | The 18 GLSL source files, one per scene plus shared libraries and the effect passes, with a README of the inputs. | **No.** They're already built into `timewarp.html`. They're here for learning and remixing. |
+| `source/time.mp4` | The original 30-second AI video by @StarlitBeRogue that the scenes were built from. Shared with her permission. | No, but it's fun to compare |
 | `src/`, `build.mjs`, `vendor/` | The page's JavaScript and HTML template, and the script that bundles everything into `timewarp.html`. | Only if you want to change the code |
 
 ## The 12 scenes
