@@ -2,6 +2,8 @@
 
 Oct 11, 2026 · @Don Hughes
 
+> **Alpha.** Timewarp is an early release, and two people have tested it so far, so expect rough edges. If a render or upload goes wrong, please [open an issue on GitHub](https://github.com/hughesdo/Timewarp-Visualizer/issues) with your browser, OS and what happened.
+
 ## What this is
 
 Don gave Claude a 30-second AI-generated music video and one long message. In about an hour, Claude turned it into a single web page that makes a new music video from any song you give it.
@@ -10,9 +12,9 @@ Claude watched the video frame by frame, split it into its different looks, and 
 
 Three things came out of the session:
 
-- **The web page, Timewarp Visualizer.** Load a song, press play, and it runs 12 scenes that react to the music, then exports an MP4. It is one HTML file of about 185 KB that runs offline, plus a shareable link version.
+- **The web page, Timewarp Visualizer.** Load a song, press play, and it runs 12 scenes that react to the music, then exports an MP4. It is one HTML file of about 885 KB that runs offline, and it's also online as a live page.
 
-- **The shader source code.** All 12 scenes plus the transition and glow effects, in a zip with a readme.
+- **The shader source code.** All 12 scenes plus the transition and glow effects, in the repo's `shaders` folder with a readme.
 
 - **A repeatable method.** This document. You can follow it with your own video, either from scratch or by reusing this page as the engine.
 
@@ -115,7 +117,7 @@ Claude worked in its own cloud workspace, a private computer where it can run pr
 
 8.  **Built the engine around the shaders.** This covered the song analyzer, the automatic editor that plans the cuts, the transitions and hit effects, the glow, the controls, and the two ways to export. Section 6 explains how these work.
 
-9.  **Tested the whole page.** Claude generated a demo beat inside the page at a known 124 BPM, with 4 deliberate section changes, then checked:
+9.  **Tested the whole page.** Claude generated a test beat at a known 124 BPM, with 4 deliberate section changes, then checked:
 
     - The analyzer measured 124.1 BPM and found all 4 section changes.
 
@@ -202,15 +204,13 @@ Everything after step 2 reads from the analysis, so the preview and the exported
 
 Open the page in Chrome or Edge, load a song, press Play, then Render. You can use the [live page](https://hughesdo.github.io/Timewarp-Visualizer/), or download timewarp.html and double-click it to open.
 
-1.  **Start.** The page opens with a built-in demo beat already analyzed, so you can press Play right away.
+1.  **Load your song.** The page opens waiting for one. Click "Load audio file", or drag the file onto the preview. MP3, WAV, M4A, AAC, OGG, FLAC and Opus all work. The analysis takes a few seconds. Play and Render stay off until a song is loaded.
 
-2.  **Load your song.** Click "Load audio file", or drag the file onto the preview. MP3, WAV, M4A, AAC, OGG, FLAC and Opus all work. The analysis takes a few seconds.
+2.  **Preview.** Press Play or the space bar. Left and right arrows jump 5 seconds. Click or drag on the colored timeline to jump anywhere.
 
-3.  **Preview.** Press Play or the space bar. Left and right arrows jump 5 seconds. Click or drag on the colored timeline to jump anywhere.
+3.  **Adjust,** if you want, with the controls below. Every change replans the edit instantly.
 
-4.  **Adjust,** if you want, with the controls below. Every change replans the edit instantly.
-
-5.  **Export.** Pick a size and click "Render MP4 (frame-perfect)". When it finishes, click "Save video".
+4.  **Export.** Pick a size and click "Render MP4 (frame-perfect)". When it finishes, click "Save video".
 
 ### Reading the timeline
 
@@ -235,15 +235,23 @@ Each colored block is one scene, labeled with its Roman numeral. Peach vertical 
 | Bitrate                                     | Video quality, 8 to 80 Mbps. 16 is a good default for 1080p, 40 or more for 4K.                                           |
 | Preview quality                             | Draft, Half, High or Full. Lower it if the preview stutters. It doesn't affect the export.                                |
 
-The page remembers your settings in that browser.
+The page remembers your settings in that browser. Hover over any export setting for a short explanation of what it does.
+
+Under the settings, the Export card shows:
+
+- **A size estimate** for the finished file, worked out from the bitrate and the song's length. A small tag appears when the video is past what a free X account can post (2 minutes 20 seconds, or 512 MB). Click a tag for details.
+- **What your browser will write**, checked before you render. A cyan dot with "H.264 + AAC · X-ready" means you're set. An amber or red dot means this browser can't make a file X will take, and says why.
+- **Posting to X**, a panel that opens with a click and explains X's limits for free and Premium accounts.
 
 ### The two ways to export
 
-- **Render MP4 (frame-perfect)** builds every frame one at a time, so nothing is ever dropped, even at 4K. It can run faster or slower than the song depending on your computer. It needs Chrome or Edge.
+- **Render MP4 (frame-perfect)** builds every frame one at a time, so nothing is ever dropped, even at 4K. It can run faster or slower than the song depending on your computer. It needs Chrome or Edge. Use this for anything you'll post.
 
-- **Record in real time** plays the song through once and records what's on screen. It works in more browsers, but a slow computer can drop frames, and you should keep the tab in front while it records.
+- **Record in real time** plays the song through once and records what's on screen. It works in more browsers, but a slow computer can drop frames, and you should keep the tab in front while it records. Some browsers save these recordings as WebM, which X won't accept.
 
-On the shared link, "Save video" asks you to confirm the download. In the HTML file it downloads directly.
+When the video is ready, the line next to Save video lists its format and size, with a tag saying whether it's X-ready.
+
+"Save video" downloads the file straight to your computer, from the live page or the HTML file.
 
 ## Doing it yourself with your own video
 
@@ -363,21 +371,19 @@ A few habits that help:
 
 ## Limits and honest notes
 
-The page works end to end, but it was tested in a cloud browser without a real graphics card, so speed on your computer is the main unknown.
+This is an alpha release. Two people have tested it on their own computers so far, and its MP4 files have been checked against X's video requirements. How fast it runs on other computers and graphics cards is the main unknown.
 
 - **Speed.** The shaders are fairly heavy. On a decent desktop or gaming laptop they should run smoothly at 1080p. On an older laptop, set Preview quality to Draft. The frame-perfect render is never affected by stutter, it just takes longer.
 
-- **Browsers.** Frame-perfect MP4 needs Chrome or Edge. Firefox and Safari can use real-time recording only. Phones aren't a good fit.
+- **Browsers.** Frame-perfect MP4 needs Chrome or Edge. Other browsers may only offer real-time recording; the Export card tells you what yours can do. Phones aren't a good fit.
 
-- **Video format.** Chrome and Edge on Windows and Mac write standard H.264 video with AAC audio. Where those aren't available, such as some Linux builds, the MP4 uses VP9 and Opus instead, which plays in VLC and browsers but not QuickTime.
+- **Video format.** Render MP4 writes H.264 video with AAC-LC audio, the format X asks for. The audio is always AAC: Chrome and Edge on Windows and Mac use their own encoder, and browsers without one (Chrome on Linux, Firefox) use an encoder built into the page. If a browser can't encode H.264, the video falls back to VP9, which plays in VLC and browsers but not on X or QuickTime. The Export card warns you before you render.
+
+- **Audio sync.** The sound sits about 21 ms behind the picture. Every AAC encoder adds this short start-up delay. It's about one frame at 60 fps, below what anyone can see.
 
 - **Real-time recordings.** A slow computer can drop frames. If the browser can only record WebM, some players show no running time for the file.
 
 - **Chalk font.** The handwritten formulas use a free Google font, Caveat. Offline, they fall back to a plain serif font.
-
-- **Saving from the shared link.** On the claude.ai link, Save asks you to confirm the download. That prompt wasn't testable from Claude's side. If Save does nothing there, use the HTML file.
-
-- **Sharing.** The artifact link is private until its owner turns on sharing from the Share menu.
 
 - **Look, not copy.** The scenes recreate the style of the source in code. They are not pixel copies of the video, and they move differently.
 
@@ -385,11 +391,13 @@ The page works end to end, but it was tested in a cloud browser without a real g
 
 - **Big exports.** A long song at 4K and a high bitrate makes a large file. Keep enough free space, and use 1080p for quick tests.
 
+- **Posting to X.** Free X accounts can post up to 2 minutes 20 seconds and 512 MB. X Premium allows up to 4 hours and 16 GB on the web. These are X's rules, not the page's, and X changes them from time to time; see [help.x.com](https://help.x.com/en/using-x/x-videos).
+
 ## For the curious: technical appendix
 
 Skip this unless you want to read or change the code. Everything lives in timewarp.html, with no installs and no server.
 
-### The shader files (in the zip)
+### The shader files (in the shaders folder)
 
 Each scene is built by joining common.glsl, any library it uses, and its own scene file, then drawing it across the whole screen.
 
@@ -442,6 +450,8 @@ Section changes become fixed cuts. The gaps between them are split into random l
 ### How the export works
 
 - **Frame-perfect:** the browser's WebCodecs encoder plus the open-source mp4-muxer library (version 5.2.2, MIT license), which is built into the file. Each frame is rendered at the exact time it belongs to, encoded, and packed with the song into an MP4.
+
+- **Audio for the MP4:** the song is converted to 44.1 or 48 kHz and at most two channels, then encoded as AAC-LC at 192 kbps stereo or 128 kbps mono. Those are the only rates Chrome's Windows encoder accepts. Browsers with no AAC encoder use FFmpeg's AAC encoder, compiled to WebAssembly and built into the page (LGPL-2.1+, with a bridge from @mediabunny/aac-encoder under MPL-2.0; see `vendor/AAC-ENCODER.md`).
 
 - **Real time:** the browser's MediaRecorder captures the canvas and the audio together as the song plays.
 
